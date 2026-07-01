@@ -1,8 +1,5 @@
-// ReconEasy — Cloudflare Worker
-// Proxies Anthropic API calls so the API key never touches the client
-
+// ReconEasy Worker - Debug version
 const ALLOWED_ORIGIN = 'https://nxrth98.github.io';
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 
 export default {
   async fetch(request, env) {
@@ -13,27 +10,29 @@ export default {
           'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
           'Access-Control-Allow-Methods': 'POST, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type',
-          'Access-Control-Max-Age': '86400',
         },
       });
     }
 
-    // Only allow POST from our app
     if (request.method !== 'POST') {
       return new Response('Method not allowed', { status: 405 });
     }
 
-    // Only allow requests from our GitHub Pages domain
-    const origin = request.headers.get('Origin');
-    if (origin !== ALLOWED_ORIGIN) {
-      return new Response('Forbidden', { status: 403 });
+    // Check if API key is available
+    if (!env.ANTHROPIC_API_KEY) {
+      return new Response(JSON.stringify({ error: 'API key not configured' }), {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
+        },
+      });
     }
 
     try {
       const body = await request.json();
 
-      // Forward to Anthropic with the secret key stored in Worker env
-      const response = await fetch(ANTHROPIC_API_URL, {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -57,7 +56,7 @@ export default {
         },
       });
     } catch (err) {
-      return new Response(JSON.stringify({ error: err.message }), {
+      return new Response(JSON.stringify({ error: err.message, stack: err.stack }), {
         status: 500,
         headers: {
           'Content-Type': 'application/json',
